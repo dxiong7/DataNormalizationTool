@@ -16,7 +16,7 @@ export type ParsedInvoice = {
     unit_price?: number;
     line_total?: number;
   }>;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 import pdfParse from 'pdf-parse';
@@ -100,7 +100,7 @@ If a field is not present in the invoice, set its value to null or an empty arra
 
   // 3. Call OpenAI LLM
   const openaiClient = new OpenAI(); // gets API Key from environment variable OPENAI_API_KEY
-  let llmResult: any = {};
+  let llmResult: Record<string, unknown> = {};
   const chatgptConfig = {
     // max_completion_tokens: 512,
     store: true

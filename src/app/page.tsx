@@ -185,7 +185,7 @@ export default function Home() {
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {inv.line_items.map((li: any, j: number) => (
+                                  {inv.line_items.map((li: { description?: string; quantity?: number; unit_price?: number; line_total?: number }, j: number) => (
                                     <tr key={j} className="border-t">
                                       <td className="px-2 py-1 text-black">{li.description ?? '-'}</td>
                                       <td className="px-2 py-1 text-black">{li.quantity ?? '-'}</td>

@@ -35,8 +35,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!files.length) {
       return res.status(400).json({ error: 'No files uploaded' });
     }
-
-    const openaiApiKey = process.env.OPENAI_API_KEY || '';
     
     // Modularized Supabase upload
     async function uploadToSupabase(fileBuffer: Buffer, fileName: string, fileType: string): Promise<{ path: string | null, error: string | null }> {
@@ -56,9 +54,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
         console.log(`[Supabase] Upload successful: ${fileName} → ${data?.path || storagePath}`);
         return { path: data?.path || storagePath, error: null };
-      } catch (e: any) {
-        console.error(`[Supabase] Upload exception for ${fileName}: ${e.message}`);
-        return { path: null, error: e.message };
+      } catch (e: unknown) {
+        console.error(`[Supabase] Upload exception for ${fileName}: ${e instanceof Error ? e.message : String(e)}`);
+        return { path: null, error: e instanceof Error ? e.message : String(e) };
       }
     }
 
@@ -77,16 +75,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             file.mimetype || ''
           );
           console.log(`[Parse] Successfully parsed invoice for file: ${fileName}`);
-        } catch (err: any) {
-          console.error(`[Parse] Parsing failed for file: ${fileName}. Error: ${err.message}`);
-          result = { error: 'Parsing failed', details: err.message };
+        } catch (err: unknown) {
+          console.error(`[Parse] Parsing failed for file: ${fileName}. Error: ${err instanceof Error ? err.message : String(err)}`);
+          result = { error: 'Parsing failed', details: err instanceof Error ? err.message : String(err) };
         }
         // Delete temp file
         try {
           fs.unlinkSync(file.filepath);
           console.log(`[Cleanup] Deleted temp file: ${file.filepath}`);
-        } catch (err: any) {
-          console.error(`[Cleanup] Failed to delete temp file: ${file.filepath}. Error: ${err.message}`);
+        } catch (err: unknown) {
+          console.error(`[Cleanup] Failed to delete temp file: ${file.filepath}. Error: ${err instanceof Error ? err.message : String(err)}`);
         }
         return {
           ...result,
