@@ -123,6 +123,8 @@ export default function Home() {
           <svg className="w-5 h-5 text-blue-700" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2a4 4 0 014-4h2a4 4 0 014 4v2"></path><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
           Customize Fields to Extract
         </h3>
+        <p className="text-blue-800 mt-2 text-xs">The AI will attempt to extract these fields from your invoice. If a field is missing or cannot be matched, you will see a warning in the results table below.</p>
+        <p className="text-xs text-blue-700 mt-1">Max {MAX_FIELDS} fields. Field keys must be unique.</p>
         <div className="flex flex-col gap-2 mb-2">
           {expectedFields.map((f, i) => (
             <div
@@ -185,10 +187,6 @@ export default function Home() {
             Reset to Default
           </button>
         </div>
-        <p className="text-blue-800 mt-2 text-xs">
-          The AI will attempt to extract these fields from your invoice. If a field is missing or cannot be matched, you will see a warning in the results table below.
-        </p>
-        <p className="text-xs text-blue-700 mt-1">Max {MAX_FIELDS} fields. Field keys must be unique.</p>
       </div>
       <div className="flex items-center justify-center w-full mb-4">
         <label
