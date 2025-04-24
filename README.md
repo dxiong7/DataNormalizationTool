@@ -1,4 +1,4 @@
-# Invoice Extractor MVP (datanormalizationtool)
+# Invoice Extractor MVP 
 
 A lightweight web tool to extract structured data from unstructured financial documents (PDF/CSV invoices) using LLMs and OCR.
 
@@ -17,11 +17,3 @@ A lightweight web tool to extract structured data from unstructured financial do
 1. Install dependencies: `npm install`
 2. Add your API keys to `.env.local` (see `.env.example`)
 3. Run dev server: `npm run dev`
-
-## Roadmap
-- [ ] File upload UI
-- [ ] Ingestion API
-- [ ] Extraction pipeline
-- [ ] Table preview/export
-- [ ] Error/confidence handling
-- [ ] User authentication (future)
