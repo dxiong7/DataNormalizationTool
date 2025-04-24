@@ -1,10 +1,20 @@
 "use client";
 import React, { useRef, useState } from "react";
-import { EXPECTED_FIELDS } from "../shared/constants";
+import { DEFAULT_SET_EXPECTED_FIELDS } from "../shared/constants";
 import type { ParsedInvoice } from "../lib/parseInvoice";
 
 const MAX_FILES = 10;
 const ACCEPTED_TYPES = ["application/pdf", "text/csv"];
+
+type ExpectedField = { key: string; label: string; desc: string };
+
+function slugify(str: string) {
+  return str
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .replace(/_+/g, '_');
+}
 
 export default function Home() {
   const [files, setFiles] = useState<File[]>([]);
@@ -13,6 +23,33 @@ export default function Home() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [results, setResults] = useState<ParsedInvoice[] | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const [expectedFields, setExpectedFields] = useState<ExpectedField[]>([...DEFAULT_SET_EXPECTED_FIELDS]);
+  const [newField, setNewField] = useState<{ label: string; desc: string }>({ label: '', desc: '' });
+  const MAX_FIELDS = 15;
+
+  const handleAddField = () => {
+    const label = newField.label.trim();
+    const desc = newField.desc.trim();
+    if (label && desc && expectedFields.length < MAX_FIELDS) {
+      let key = slugify(label);
+      let uniqueKey = key;
+      let suffix = 2;
+      while (expectedFields.some(f => f.key === uniqueKey)) {
+        uniqueKey = `${key}_${suffix++}`;
+      }
+      setExpectedFields(prev => [...prev, { key: uniqueKey, label, desc }]);
+      setNewField({ label: '', desc: '' });
+    }
+  };
+
+  const handleRemoveField = (idx: number) => {
+    setExpectedFields(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleResetFields = () => {
+    setExpectedFields([...DEFAULT_SET_EXPECTED_FIELDS]);
+  };
+
 
   async function handleUpload() {
     setUploadError(null);
@@ -20,6 +57,7 @@ export default function Home() {
     setResults(null);
     const formData = new FormData();
     files.forEach(f => formData.append('file', f));
+    formData.append('expectedFields', JSON.stringify(expectedFields));
     try {
       const res = await fetch('/api/ingest', {
         method: 'POST',
@@ -39,6 +77,7 @@ export default function Home() {
       } else {
         setResults([]);
       }
+      console.log("From the frontend: " + JSON.stringify(data, null, 2).slice(0, 100) + '...');
     } catch (err: unknown) {
       if (err instanceof Error) {
         setUploadError(err.message || 'Upload failed');
@@ -80,15 +119,76 @@ export default function Home() {
   return (
     <div className="flex flex-col items-center min-h-screen justify-center p-8">
       <div className="w-full max-w-2xl mb-6 bg-blue-50 border border-blue-200 rounded p-4">
-        <h3 className="font-semibold text-blue-900 mb-2">What fields will be extracted?</h3>
-        <ul className="list-disc list-inside text-blue-900 text-sm">
-          {EXPECTED_FIELDS.map((f: { key: string; label: string; desc: string }) => (
-            <li key={f.key}><span className="font-semibold">{f.label}:</span> {f.desc}</li>
+        <h3 className="font-semibold text-blue-900 mb-3 text-lg flex items-center gap-2">
+          <svg className="w-5 h-5 text-blue-700" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2a4 4 0 014-4h2a4 4 0 014 4v2"></path><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+          Customize Fields to Extract
+        </h3>
+        <div className="flex flex-col gap-2 mb-2">
+          {expectedFields.map((f, i) => (
+            <div
+              key={f.key}
+              className="flex items-center justify-between bg-white rounded border border-blue-100 px-3 py-2 shadow-sm transition hover:shadow-md"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-1">
+                <span className="font-semibold text-blue-900">{f.label}</span>
+                <span className="text-blue-900 text-xs hidden sm:inline">|</span>
+                <span className="text-blue-900 text-xs">{f.desc}</span>
+              </div>
+              {expectedFields.length > 1 && (
+                <button
+                  type="button"
+                  className="ml-4 text-xs text-red-600 hover:underline hover:text-red-800 transition"
+                  onClick={() => handleRemoveField(i)}
+                  aria-label={`Remove field ${f.label}`}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
           ))}
-        </ul>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 mt-3">
+          <input
+            type="text"
+            placeholder="Label (The field label that will show up on the results table, e.g. Vendor)"
+            className="border px-2 py-1 rounded text-xs text-blue-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300"
+            value={newField.label}
+            maxLength={32}
+            onChange={e => setNewField(f => ({ ...f, label: e.target.value }))}
+          />
+          <input
+            type="text"
+            placeholder="Description (Describe what the field represents)"
+            className="border px-2 py-1 rounded text-xs text-blue-900 bg-white flex-1 focus:outline-none focus:ring-2 focus:ring-blue-300"
+            value={newField.desc}
+            maxLength={64}
+            onChange={e => setNewField(f => ({ ...f, desc: e.target.value }))}
+          />
+          <button
+            type="button"
+            className="bg-blue-600 text-white px-3 py-1 rounded disabled:opacity-60"
+            onClick={handleAddField}
+            disabled={
+              !newField.label.trim() ||
+              !newField.desc.trim() ||
+              expectedFields.length >= MAX_FIELDS
+            }
+          >
+            Add
+          </button>
+          <button
+            type="button"
+            className="bg-gray-200 text-gray-700 px-2 py-1 rounded border ml-2"
+            onClick={handleResetFields}
+            disabled={expectedFields.length === DEFAULT_SET_EXPECTED_FIELDS.length && expectedFields.every((f, i) => f.key === DEFAULT_SET_EXPECTED_FIELDS[i].key)}
+          >
+            Reset to Default
+          </button>
+        </div>
         <p className="text-blue-800 mt-2 text-xs">
           The AI will attempt to extract these fields from your invoice. If a field is missing or cannot be matched, you will see a warning in the results table below.
         </p>
+        <p className="text-xs text-blue-700 mt-1">Max {MAX_FIELDS} fields. Field keys must be unique.</p>
       </div>
       <div className="flex items-center justify-center w-full mb-4">
         <label
@@ -135,6 +235,24 @@ export default function Home() {
       {results && (
         <div className="w-full max-w-2xl mt-6 p-4 bg-white rounded border">
           <h2 className="text-lg font-semibold mb-2 text-black">Parsed Results</h2>
+          {results.length > 0 && (
+            <div className="mb-4">
+              {results.some(r => Array.isArray((r as any).missing_fields) && (r as any).missing_fields.length > 0) && (
+                <div className="bg-yellow-100 border-l-4 border-yellow-400 text-yellow-800 p-3 mb-3 rounded">
+                  <strong>Warning:</strong> Some fields present in the expected fields could not be found in the invoice:
+                  <ul className="list-disc list-inside ml-4">
+                    {results.map((r, i) =>
+                      Array.isArray((r as any).missing_fields) && (r as any).missing_fields.length > 0 ? (
+                        <li key={i}>
+                          {(r as any).missing_fields.join(', ')}
+                        </li>
+                      ) : null
+                    )}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
           {Array.isArray(results) ? (
             <div className="overflow-x-auto">
               <table className="min-w-full text-xs text-left border border-gray-300 rounded bg-gray-50">

@@ -3,6 +3,7 @@ import formidable, { File } from 'formidable';
 import fs from 'fs';
 import { parseInvoice } from '../../lib/parseInvoice';
 import { supabase } from '../../lib/supabase';
+import { DEFAULT_SET_EXPECTED_FIELDS } from '../../shared/constants';
 
 // Disable Next.js body parser for file uploads
 export const config = {
@@ -14,13 +15,13 @@ export const config = {
 const INVOICES_SUPABASE_BUCKET = 'invoices';
 
 // Helper to parse multipart form
-function parseForm(req: NextApiRequest): Promise<{ files: File[] }> {
+function parseForm(req: NextApiRequest): Promise<{ files: File[], fields: Record<string, unknown> }> {
   const form = formidable({ multiples: true });
   return new Promise((resolve, reject) => {
     form.parse(req, (err, fields, files) => {
       if (err) return reject(err);
       const fileArr = Array.isArray(files.file) ? files.file : files.file ? [files.file] : [];
-      resolve({ files: fileArr });
+      resolve({ files: fileArr, fields });
     });
   });
 }
@@ -31,7 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { files } = await parseForm(req);
+    const { files, fields } = await parseForm(req);
     if (!files.length) {
       return res.status(400).json({ error: 'No files uploaded' });
     }
@@ -60,6 +61,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
+    // Parse expectedFields from form fields
+    let expectedFields;
+    try {
+      if (fields.expectedFields) {
+        const parsed = JSON.parse(Array.isArray(fields.expectedFields) ? fields.expectedFields[0] : fields.expectedFields);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed.length <= 15 && parsed.every(f => typeof f.key === 'string' && typeof f.label === 'string' && typeof f.desc === 'string')) {
+          expectedFields = parsed;
+        }
+      }
+    } catch {}
+    if (!expectedFields) {
+      console.log('No expectedFields provided, using default set');
+      expectedFields = DEFAULT_SET_EXPECTED_FIELDS;
+    }
+
     const parsedResults = await Promise.all(
       files.map(async (file) => {
         const fileBuffer = fs.readFileSync(file.filepath);
@@ -68,12 +84,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const { path: storageUrl, error: uploadError } = await uploadToSupabase(fileBuffer, fileName, file.mimetype || '');
         // Parse invoice
         let result;
+        let missing_fields: string[] = [];
         try {
           result = await parseInvoice(
             fileBuffer,
             fileName,
-            file.mimetype || ''
+            file.mimetype || '',
+            expectedFields
           );
+          // if (result && typeof result === 'object' && Array.isArray(result._missing_fields)) {
+          //   console.log('Removing the internal only _missing_fields array from parsed result')
+          //   missing_fields = result._missing_fields;
+          //   delete result._missing_fields;
+          // }
           console.log(`[Parse] Successfully parsed invoice for file: ${fileName}`);
         } catch (err: unknown) {
           console.error(`[Parse] Parsing failed for file: ${fileName}. Error: ${err instanceof Error ? err.message : String(err)}`);

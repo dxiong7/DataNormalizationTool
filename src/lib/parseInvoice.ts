@@ -23,12 +23,13 @@ import pdfParse from 'pdf-parse';
 import Tesseract from 'tesseract.js';
 import { OpenAI } from 'openai';
 import { parse as csvParse } from 'csv-parse/sync';
-import { EXPECTED_FIELDS } from '../shared/constants';
+import { DEFAULT_SET_EXPECTED_FIELDS } from '../shared/constants';
 
 export async function parseInvoice(
   fileBuffer: Buffer,
   fileName: string,
-  fileType: string
+  fileType: string,
+  expectedFields: { key: string; label: string; desc: string }[] = DEFAULT_SET_EXPECTED_FIELDS
 ): Promise<ParsedInvoice> {
   console.time('parseInvoice:total');
   let extractedText = '';
@@ -78,25 +79,12 @@ export async function parseInvoice(
   console.timeEnd('parseInvoice:extract');
 
   // 2. Prepare prompt for LLM
-  const prompt = `You are an invoice parsing assistant. Extract the following fields from the provided invoice text and return them as a JSON object with this structure:\n\n{
-  "vendor": string | null,
-  "invoice_number": string | null,
-  "invoice_date": string | null,
-  "due_date": string | null,
-  "tax": number | null,
-  "fees": number | null,
-  "total_amount": number | null,
-  "line_items": [
-    {
-      "description": string,
-      "quantity": number,
-      "unit_price": number,
-      "line_total": number
-    },
-    ...
-  ]
+  const fieldList = expectedFields.map(f => `  "${f.key}": // ${f.label} - ${f.desc}`).join("\n");
+  const prompt = `You are an invoice parsing assistant. Extract the following fields from the provided invoice text. Try to semantically match the requested fields to the fields found in the invoice (using the labels and descriptions as context), even if the names or formats differ. Return a JSON object with this structure:\n\n{
+${fieldList},
+  "_missing_fields": [array of field keys that were requested but could not be found or matched]
 }\n
-If a field is not present in the invoice, set its value to null or an empty array for line_items. Only return valid JSON.\n\nInvoice text:\n${extractedText}`;
+If a field is not present in the invoice, set its value to null (or an empty array for array fields), and include its key in the _missing_fields array. Only return valid JSON.\n\nInvoice text:\n${extractedText}`;
 
   // 3. Call OpenAI LLM
   const openaiClient = new OpenAI(); // gets API Key from environment variable OPENAI_API_KEY
@@ -127,8 +115,14 @@ If a field is not present in the invoice, set its value to null or an empty arra
       content = content.trim();
     }
 
+    let missing_fields: string[] = [];
     try {
       llmResult = JSON.parse(content);
+      // save the content in '_missing_fields' and then remove it from the JSON
+      if (Array.isArray(llmResult._missing_fields)) {
+        missing_fields = llmResult._missing_fields;
+        delete llmResult._missing_fields;
+      }
     } catch (err) {
       console.error('Error parsing LLM response as JSON: ' + String(err));
       llmResult = { error: 'LLM parsing as JSON failed', details: String(err) };
@@ -140,12 +134,14 @@ If a field is not present in the invoice, set its value to null or an empty arra
   console.timeEnd('parseInvoice:llm');
 
   // 4. Field diagnostics
-  const expectedFields = EXPECTED_FIELDS.map((f: { key: string }) => f.key);
+  const expectedFieldKeys = expectedFields.map((f: { key: string }) => f.key);
   const presentFields = llmResult && typeof llmResult === 'object' ? Object.keys(llmResult) : [];
-  const missing_fields = expectedFields.filter(
+  const missing_fields = expectedFieldKeys.filter(
     (key: string) => !(presentFields.includes(key) && llmResult[key] !== null && llmResult[key] !== undefined && llmResult[key] !== '')
   );
-  const unmatched_fields = presentFields.filter((key: string) => !expectedFields.includes(key));
+  const unmatched_fields = presentFields.filter((key: string) => !expectedFieldKeys.includes(key));
+  console.log('Missing fields (fields that were expected but not present in the invoice): ' + missing_fields.join(', '));
+  console.log('Unmatched fields (fields that were present in the invoice but not in the expected fields): ' + unmatched_fields.join(', '));
 
   // 5. Return parsed invoice with diagnostics
   console.timeEnd('parseInvoice:total');

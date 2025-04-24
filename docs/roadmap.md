@@ -4,6 +4,7 @@ Updated 4/23/2025
 - [x] Add Supabase storage integration for uploaded files
 - [x] Table preview UI
 - [x] CSV input support
+- [ ] Handle unmatched fields in LLM request/response (fields extracted in input document but not in expected fields) 
 - [ ] Export parsed results as CSV, JSON, etc (include file name in export)
 - [ ] Add database integration for parsed results (persistent storage)
 - [ ] Add user authentication

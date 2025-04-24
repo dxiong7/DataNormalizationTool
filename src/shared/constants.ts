@@ -1,5 +1,5 @@
 // Shared constants for invoice parsing and UI
-export const EXPECTED_FIELDS = [
+export const DEFAULT_SET_EXPECTED_FIELDS = [
   { key: 'vendor', label: 'Vendor', desc: 'Name of the invoice issuer/company' },
   { key: 'invoice_number', label: 'Invoice #', desc: 'Unique invoice identifier' },
   { key: 'invoice_date', label: 'Invoice Date', desc: 'Date the invoice was issued' },
