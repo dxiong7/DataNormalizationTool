@@ -84,7 +84,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const { path: storageUrl, error: uploadError } = await uploadToSupabase(fileBuffer, fileName, file.mimetype || '');
         // Parse invoice
         let result;
-        let missing_fields: string[] = [];
         try {
           result = await parseInvoice(
             fileBuffer,
@@ -92,11 +91,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             file.mimetype || '',
             expectedFields
           );
-          // if (result && typeof result === 'object' && Array.isArray(result._missing_fields)) {
-          //   console.log('Removing the internal only _missing_fields array from parsed result')
-          //   missing_fields = result._missing_fields;
-          //   delete result._missing_fields;
-          // }
           console.log(`[Parse] Successfully parsed invoice for file: ${fileName}`);
         } catch (err: unknown) {
           console.error(`[Parse] Parsing failed for file: ${fileName}. Error: ${err instanceof Error ? err.message : String(err)}`);

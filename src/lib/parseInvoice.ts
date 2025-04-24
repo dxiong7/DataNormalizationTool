@@ -115,12 +115,11 @@ If a field is not present in the invoice, set its value to null (or an empty arr
       content = content.trim();
     }
 
-    let missing_fields: string[] = [];
     try {
       llmResult = JSON.parse(content);
-      // save the content in '_missing_fields' and then remove it from the JSON
+      // log and remove _missing_fields if present
       if (Array.isArray(llmResult._missing_fields)) {
-        missing_fields = llmResult._missing_fields;
+        console.log('Missing fields (fields that were expected but not present in the invoice): ' + llmResult._missing_fields.join(', '));
         delete llmResult._missing_fields;
       }
     } catch (err) {
@@ -140,7 +139,6 @@ If a field is not present in the invoice, set its value to null (or an empty arr
     (key: string) => !(presentFields.includes(key) && llmResult[key] !== null && llmResult[key] !== undefined && llmResult[key] !== '')
   );
   const unmatched_fields = presentFields.filter((key: string) => !expectedFieldKeys.includes(key));
-  console.log('Missing fields (fields that were expected but not present in the invoice): ' + missing_fields.join(', '));
   console.log('Unmatched fields (fields that were present in the invoice but not in the expected fields): ' + unmatched_fields.join(', '));
 
   // 5. Return parsed invoice with diagnostics

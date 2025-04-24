@@ -31,7 +31,7 @@ export default function Home() {
     const label = newField.label.trim();
     const desc = newField.desc.trim();
     if (label && desc && expectedFields.length < MAX_FIELDS) {
-      let key = slugify(label);
+      const key = slugify(label);
       let uniqueKey = key;
       let suffix = 2;
       while (expectedFields.some(f => f.key === uniqueKey)) {
@@ -237,14 +237,14 @@ export default function Home() {
           <h2 className="text-lg font-semibold mb-2 text-black">Parsed Results</h2>
           {results.length > 0 && (
             <div className="mb-4">
-              {results.some(r => Array.isArray((r as any).missing_fields) && (r as any).missing_fields.length > 0) && (
+              {(results as Array<ParsedInvoice & { missing_fields?: string[] }>).some(r => Array.isArray(r.missing_fields) && r.missing_fields.length > 0) && (
                 <div className="bg-yellow-100 border-l-4 border-yellow-400 text-yellow-800 p-3 mb-3 rounded">
                   <strong>Warning:</strong> Some fields present in the expected fields could not be found in the invoice:
                   <ul className="list-disc list-inside ml-4">
-                    {results.map((r, i) =>
-                      Array.isArray((r as any).missing_fields) && (r as any).missing_fields.length > 0 ? (
+                    {(results as Array<ParsedInvoice & { missing_fields?: string[] }>).map((r, i) =>
+                      Array.isArray(r.missing_fields) && r.missing_fields.length > 0 ? (
                         <li key={i}>
-                          {(r as any).missing_fields.join(', ')}
+                          {r.missing_fields.join(', ')}
                         </li>
                       ) : null
                     )}
