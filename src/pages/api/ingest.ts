@@ -3,7 +3,6 @@ import formidable, { File } from 'formidable';
 import fs from 'fs';
 import { parseInvoice } from '../../lib/parseInvoice';
 import { supabase } from '../../lib/supabase';
-import path from 'path';
 
 // Disable Next.js body parser for file uploads
 export const config = {
@@ -75,8 +74,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           result = await parseInvoice(
             fileBuffer,
             fileName,
-            file.mimetype || '',
-            openaiApiKey
+            file.mimetype || ''
           );
           console.log(`[Parse] Successfully parsed invoice for file: ${fileName}`);
         } catch (err: any) {
@@ -99,7 +97,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
 
     return res.status(200).json({ results: parsedResults });
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message || 'Internal server error' });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return res.status(500).json({ error: error.message || 'Internal server error' });
+    } else {
+      return res.status(500).json({ error: 'Internal server error' });
+    }
   }
 }

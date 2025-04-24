@@ -1,4 +1,4 @@
-import type { Readable } from 'stream';
+
 
 export type ParsedInvoice = {
   vendor?: string;
@@ -28,13 +28,12 @@ import { EXPECTED_FIELDS } from '../shared/constants';
 export async function parseInvoice(
   fileBuffer: Buffer,
   fileName: string,
-  fileType: string,
-  openaiApiKey: string
+  fileType: string
 ): Promise<ParsedInvoice> {
   console.time('parseInvoice:total');
   let extractedText = '';
-  let rawData: any = null;
-  let extractionMethod = '';
+  let rawData: Record<string, unknown> | null = null;
+  let extractionMethod: string = "";
 
   // 1. Extract text depending on file type
   console.time('parseInvoice:extract');
@@ -53,7 +52,8 @@ export async function parseInvoice(
         extractedText = ocrText.trim();
         extractionMethod = 'tesseract-ocr';
       }
-    } catch (err) {
+    } catch (err: unknown) {
+      console.error('Error extracting text from PDF: ' + (err instanceof Error ? err.message : String(err)));
       // On error, fallback to OCR
       const image = Buffer.from(fileBuffer);
       const { data: { text: ocrText } } = await Tesseract.recognize(image, 'eng');
@@ -67,7 +67,8 @@ export async function parseInvoice(
       rawData = csvParse(csvText, { columns: true });
       extractedText = JSON.stringify(rawData, null, 2);
       extractionMethod = 'csv-parse';
-    } catch (err) {
+    } catch (err: unknown) {
+      console.error('Error parsing CSV: ' + (err instanceof Error ? err.message : String(err)));
       extractedText = fileBuffer.toString('utf8');
       extractionMethod = 'csv-fallback';
     }

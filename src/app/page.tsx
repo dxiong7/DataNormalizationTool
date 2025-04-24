@@ -1,6 +1,7 @@
 "use client";
 import React, { useRef, useState } from "react";
 import { EXPECTED_FIELDS } from "../shared/constants";
+import type { ParsedInvoice } from "../lib/parseInvoice";
 
 const MAX_FILES = 10;
 const ACCEPTED_TYPES = ["application/pdf", "text/csv"];
@@ -10,7 +11,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [results, setResults] = useState<any>(null);
+  const [results, setResults] = useState<ParsedInvoice[] | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   async function handleUpload() {
@@ -38,8 +39,12 @@ export default function Home() {
       } else {
         setResults([]);
       }
-    } catch (err: any) {
-      setUploadError(err.message || 'Upload failed');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setUploadError(err.message || 'Upload failed');
+      } else {
+        setUploadError('Upload failed');
+      }
     } finally {
       setUploading(false);
     }
@@ -48,7 +53,7 @@ export default function Home() {
   const onDrop = (event: React.DragEvent) => {
     event.preventDefault();
     setError(null);
-    let dropped = Array.from(event.dataTransfer.files);
+    const dropped = Array.from(event.dataTransfer.files);
     if (files.length + dropped.length > MAX_FILES) {
       setError(`You can upload up to ${MAX_FILES} files.`);
       return;
