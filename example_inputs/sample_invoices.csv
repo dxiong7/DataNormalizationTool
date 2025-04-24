@@ -1,0 +1,5 @@
+Invoice Number,Invoice Date,Due Date,Bill To,Company Name,Address,City,State,ZIP,Country,Item Description,Quantity,Unit Price,Line Total,Subtotal,Tax Rate,Tax Amount,Total Amount,Payment Terms,Notes
+INV-2025-0042,2025-04-15,2025-05-15,John Doe,Acme Corporation,123 Market Street,San Francisco,CA,94105,USA,Website Design Services,1,3000.00,3000.00,3000.00,0.0875,262.50,3262.50,Net 30,Thank you for your business.
+,,,,,,,,,,Hosting (12 months),1,240.00,240.00,,,,,
+,,,,,,,,,,Domain Registration,1,15.00,15.00,,,,,
+,,,,,,,,,,,,,,,

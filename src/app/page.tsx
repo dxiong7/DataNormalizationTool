@@ -1,103 +1,213 @@
-import Image from "next/image";
+"use client";
+import React, { useRef, useState } from "react";
+import { EXPECTED_FIELDS } from "../shared/constants";
+
+const MAX_FILES = 10;
+const ACCEPTED_TYPES = ["application/pdf", "text/csv"];
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [files, setFiles] = useState<File[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [results, setResults] = useState<any>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  async function handleUpload() {
+    setUploadError(null);
+    setUploading(true);
+    setResults(null);
+    const formData = new FormData();
+    files.forEach(f => formData.append('file', f));
+    try {
+      const res = await fetch('/api/ingest', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Upload failed');
+      }
+      const data = await res.json();
+      console.log(JSON.stringify(data, null, 2).slice(0, 100) + '...');
+      // Always set results as an array for table rendering
+      if (Array.isArray(data.results)) {
+        setResults(data.results);
+      } else if (data.results) {
+        setResults([data.results]);
+      } else {
+        setResults([]);
+      }
+    } catch (err: any) {
+      setUploadError(err.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const onDrop = (event: React.DragEvent) => {
+    event.preventDefault();
+    setError(null);
+    let dropped = Array.from(event.dataTransfer.files);
+    if (files.length + dropped.length > MAX_FILES) {
+      setError(`You can upload up to ${MAX_FILES} files.`);
+      return;
+    }
+    const valid = dropped.filter(f => ACCEPTED_TYPES.includes(f.type));
+    setFiles(prev => [...prev, ...valid].slice(0, MAX_FILES));
+  };
+
+  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setError(null);
+    const selected = e.target.files ? Array.from(e.target.files) : [];
+    if (files.length + selected.length > MAX_FILES) {
+      setError(`You can upload up to ${MAX_FILES} files.`);
+      return;
+    }
+    const valid = selected.filter(f => ACCEPTED_TYPES.includes(f.type));
+    setFiles(prev => [...prev, ...valid].slice(0, MAX_FILES));
+  };
+
+  const removeFile = (idx: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  return (
+    <div className="flex flex-col items-center min-h-screen justify-center p-8">
+      <div className="w-full max-w-2xl mb-6 bg-blue-50 border border-blue-200 rounded p-4">
+        <h3 className="font-semibold text-blue-900 mb-2">What fields will be extracted?</h3>
+        <ul className="list-disc list-inside text-blue-900 text-sm">
+          {EXPECTED_FIELDS.map((f: { key: string; label: string; desc: string }) => (
+            <li key={f.key}><span className="font-semibold">{f.label}:</span> {f.desc}</li>
+          ))}
+        </ul>
+        <p className="text-blue-800 mt-2 text-xs">
+          The AI will attempt to extract these fields from your invoice. If a field is missing or cannot be matched, you will see a warning in the results table below.
+        </p>
+      </div>
+      <div className="flex items-center justify-center w-full mb-4">
+        <label
+          htmlFor="dropzone-file"
+          className="flex flex-col items-center justify-center w-full max-w-md h-64 border-4 border-gray-400 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-600 shadow-lg transition"
+          onDrop={onDrop}
+          onDragOver={e => e.preventDefault()}
+        >
+          <div className="flex flex-col items-center justify-center pt-5 pb-6">
+            <svg className="w-8 h-8 mb-4 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+              <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+            </svg>
+            <p className="mb-2 text-sm text-gray-500 dark:text-gray-400"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">PDF or CSV files only (max {MAX_FILES} files)</p>
+          </div>
+          <input
+            id="dropzone-file"
+            ref={inputRef}
+            type="file"
+            accept=".pdf,.csv"
+            multiple
+            className="hidden"
+            onChange={onFileChange}
+          />
+        </label>
+      </div>
+      {error && <div className="text-red-500 mb-2">{error}</div>}
+      <ul className="w-full max-w-md mb-4">
+        {files.map((file, idx) => (
+          <li key={file.name + idx} className="flex justify-between items-center py-1 px-2 border-b text-white bg-gray-800">
+            <span>{file.name}</span>
+            <button className="text-xs text-red-500 hover:underline" onClick={e => { e.stopPropagation(); removeFile(idx); }}>Remove</button>
+          </li>
+        ))}
+      </ul>
+      <button
+        className="bg-blue-600 text-white px-6 py-2 rounded disabled:opacity-50 mb-4"
+        disabled={files.length === 0 || uploading}
+        onClick={handleUpload}
+      >
+        {uploading ? 'Uploading...' : 'Upload & Parse'}
+      </button>
+      {uploadError && <div className="text-red-500 mb-2">{uploadError}</div>}
+      {results && (
+        <div className="w-full max-w-2xl mt-6 p-4 bg-white rounded border">
+          <h2 className="text-lg font-semibold mb-2 text-black">Parsed Results</h2>
+          {Array.isArray(results) ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs text-left border border-gray-300 rounded bg-gray-50">
+                <thead className="bg-gray-200">
+                  <tr>
+                    <th className="px-3 py-2 text-black">Vendor</th>
+                    <th className="px-3 py-2 text-black">Invoice #</th>
+                    <th className="px-3 py-2 text-black">Invoice Date</th>
+                    <th className="px-3 py-2 text-black">Due Date</th>
+                    <th className="px-3 py-2 text-black">Total</th>
+                    <th className="px-3 py-2 text-black">Line Items</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.map((inv, i) => (
+                    <React.Fragment key={i}>
+                      {(Array.isArray(inv.missing_fields) && inv.missing_fields.length > 0) && (
+                        <tr>
+                          <td colSpan={6} className="bg-yellow-100 text-yellow-900 px-3 py-2 border-t border-b border-yellow-300">
+                            <strong>Missing fields:</strong> {inv.missing_fields.join(', ')}
+                          </td>
+                        </tr>
+                      )}
+                      {(Array.isArray(inv.unmatched_fields) && inv.unmatched_fields.length > 0) && (
+                        <tr>
+                          <td colSpan={6} className="bg-blue-100 text-blue-900 px-3 py-2 border-t border-b border-blue-300">
+                            <strong>Unmatched fields:</strong> {inv.unmatched_fields.join(', ')}
+                          </td>
+                        </tr>
+                      )}
+                      <tr className="border-t border-gray-200 hover:bg-gray-100">
+                        <td className="px-3 py-2 text-black">{inv.vendor ?? '-'}</td>
+                        <td className="px-3 py-2 text-black">{inv.invoice_number ?? '-'}</td>
+                        <td className="px-3 py-2 text-black">{inv.invoice_date ?? '-'}</td>
+                        <td className="px-3 py-2 text-black">{inv.due_date ?? '-'}</td>
+                        <td className="px-3 py-2 text-black">{inv.total_amount ?? '-'}</td>
+                        <td className="px-3 py-2 text-black">
+                          {Array.isArray(inv.line_items) && inv.line_items.length > 0 ? (
+                            <details>
+                              <summary className="cursor-pointer text-blue-700 hover:underline">View</summary>
+                              <table className="mt-2 min-w-max bg-white border border-gray-200 rounded">
+                                <thead className="bg-gray-100">
+                                  <tr>
+                                    <th className="px-2 py-1 text-black">Description</th>
+                                    <th className="px-2 py-1 text-black">Qty</th>
+                                    <th className="px-2 py-1 text-black">Unit Price</th>
+                                    <th className="px-2 py-1 text-black">Line Total</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {inv.line_items.map((li: any, j: number) => (
+                                    <tr key={j} className="border-t">
+                                      <td className="px-2 py-1 text-black">{li.description ?? '-'}</td>
+                                      <td className="px-2 py-1 text-black">{li.quantity ?? '-'}</td>
+                                      <td className="px-2 py-1 text-black">{li.unit_price ?? '-'}</td>
+                                      <td className="px-2 py-1 text-black">{li.line_total ?? '-'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </details>
+                          ) : (
+                            <span className="text-gray-400 text-black">None</span>
+                          )}
+                        </td>
+                      </tr>
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <pre className="overflow-x-auto text-xs bg-gray-100 p-2 rounded text-black">
+              {JSON.stringify(results, null, 2)}
+            </pre>
+          )}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      )}
     </div>
   );
 }
